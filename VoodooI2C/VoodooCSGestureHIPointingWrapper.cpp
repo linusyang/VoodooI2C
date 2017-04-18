@@ -9,6 +9,8 @@
 #include <IOKit/IOLib.h>
 #include <IOKit/hidsystem/IOHIDParameter.h>
 #include "VoodooCSGestureHIPointingWrapper.h"
+#include <libkern/version.h>
+
 
 OSDefineMetaClassAndStructors(VoodooCSGestureHIPointingWrapper, IOHIPointing);
 
@@ -41,6 +43,21 @@ bool VoodooCSGestureHIPointingWrapper::start(IOService *provider){
     if (!super::start(provider))
         return false;
     
+    if (version_major>=16) {
+        
+        setProperty("SupportsGestureScrolling", true);
+        setProperty("TrackpadFourFingerGestures", false);
+        setProperty("ApplePreferenceIdentifier", "com.apple.AppleMultitouchTrackpad");
+        setProperty("MTHIDDevice", true);
+        setProperty("MT Built-in", true);
+        setProperty("ApplePreferenceCapability", true);
+        setProperty("TrackpadEmbedded", true);
+        setProperty("TrackpadThreeFingerDrag", false);
+        
+    }
+    
+    
+    
     int enabledProperty = 1;
     setProperty("Clicking", enabledProperty,
                 sizeof(enabledProperty) * 8);
@@ -48,6 +65,8 @@ bool VoodooCSGestureHIPointingWrapper::start(IOService *provider){
                 sizeof(enabledProperty) * 8);
     setProperty("TrackpadHorizScroll", enabledProperty,
                 sizeof(enabledProperty) * 8);
+    
+    
     
     //
     // Must add this property to let our superclass know that it should handle
@@ -67,6 +86,9 @@ bool VoodooCSGestureHIPointingWrapper::start(IOService *provider){
     setProperty(kIOHIDPointerAccelerationTypeKey, kIOHIDTrackpadAccelerationType);
     setProperty(kIOHIDScrollAccelerationTypeKey, kIOHIDTrackpadScrollAccelerationKey);
     setProperty(kIOHIDScrollResolutionKey, 800 << 16, 32);
+    
+    setProperty("HIDScrollResolutionX", 800 << 16, 32);
+    setProperty("HIDScrollResolutionY", 800 << 16, 32);
     
     return true;
 }
@@ -95,26 +117,51 @@ void VoodooCSGestureHIPointingWrapper::updateScroll(short dy, short dx, short dz
 
 IOReturn VoodooCSGestureHIPointingWrapper::setParamProperties(OSDictionary *dict)
 {
- 
+    
     /*Known Keys:
-        HIDDefaultParameters, HIDClickTime, HIDClickSpace, HIDKeyRepeat, HIDInitialKeyRepeat, HIDPointerAcceleration, HIDScrollAcceleration, HIDPointerButtonMode, HIDF12EjectDelay, EjectDelay, HIDSlowKeysDelay, HIDStickyKeysDisabled, HIDStickyKeysOn, HIDStickyKeysShiftToggles, HIDMouseKeysOptionToggles, HIDFKeyMode, HIDMouseKeysOn, HIDKeyboardModifierMappingPairs, MouseKeysStopsTrackpad, HIDScrollZoomModifierMask, HIDMouseAcceleration, HIDMouseScrollAcceleration, HIDTrackpadAcceleration, HIDTrackpadScrollAcceleration, TrackpadPinch, TrackpadFourFingerVertSwipeGesture, TrackpadRotate, TrackpadHorizScroll, TrackpadFourFingerPinchGesture, TrackpadTwoFingerDoubleTapGesture, TrackpadMomentumScroll, TrackpadThreeFingerTapGesture, TrackpadThreeFingerHorizSwipeGesture, Clicking, TrackpadScroll, DragLock, TrackpadFiveFingerPinchGesture, TrackpadThreeFingerVertSwipeGesture, TrackpadTwoFingerFromRightEdgeSwipeGesture, Dragging, TrackpadRightClick, TrackpadCornerSecondaryClick, TrackpadFourFingerHorizSwipeGesture, TrackpadThreeFingerDrag, JitterNoMove, JitterNoClick, PalmNoAction When Typing, PalmNoAction Permanent, TwofingerNoAction, OutsidezoneNoAction When Typing, Use Panther Settings for W, Trackpad Jitter Milliseconds, USBMouseStopsTrackpad, HIDWaitCursorFrameInterval*/
+     HIDDefaultParameters, HIDClickTime, HIDClickSpace, HIDKeyRepeat, HIDInitialKeyRepeat, HIDPointerAcceleration, HIDScrollAcceleration, HIDPointerButtonMode, HIDF12EjectDelay, EjectDelay, HIDSlowKeysDelay, HIDStickyKeysDisabled, HIDStickyKeysOn, HIDStickyKeysShiftToggles, HIDMouseKeysOptionToggles, HIDFKeyMode, HIDMouseKeysOn, HIDKeyboardModifierMappingPairs, MouseKeysStopsTrackpad, HIDScrollZoomModifierMask, HIDMouseAcceleration, HIDMouseScrollAcceleration, HIDTrackpadAcceleration, HIDTrackpadScrollAcceleration, TrackpadPinch, TrackpadFourFingerVertSwipeGesture, TrackpadRotate, TrackpadHorizScroll, TrackpadFourFingerPinchGesture, TrackpadTwoFingerDoubleTapGesture, TrackpadMomentumScroll, TrackpadThreeFingerTapGesture, TrackpadThreeFingerHorizSwipeGesture, Clicking, TrackpadScroll, DragLock, TrackpadFiveFingerPinchGesture, TrackpadThreeFingerVertSwipeGesture, TrackpadTwoFingerFromRightEdgeSwipeGesture, Dragging, TrackpadRightClick, TrackpadCornerSecondaryClick, TrackpadFourFingerHorizSwipeGesture, TrackpadThreeFingerDrag, JitterNoMove, JitterNoClick, PalmNoAction When Typing, PalmNoAction Permanent, TwofingerNoAction, OutsidezoneNoAction When Typing, Use Panther Settings for W, Trackpad Jitter Milliseconds, USBMouseStopsTrackpad, HIDWaitCursorFrameInterval*/
     
-    OSNumber *clicking = OSDynamicCast(OSNumber, dict->getObject("Clicking"));
-    if (clicking){
-        gesturerec->softc->settings.tapToClickEnabled = clicking->unsigned32BitValue() & 0x1;
-    }
-    
-    OSNumber *dragging = OSDynamicCast(OSNumber, dict->getObject("Dragging"));
-    if (dragging){
-        gesturerec->softc->settings.tapDragEnabled = dragging->unsigned32BitValue() & 0x1;
+    if (version_major >= 16){
+        /*
+        macOS 10.12 (and above)
+        Sierra fix requires the cast to be changed to OSBoolean
+        */
+        
+        OSBoolean *clicking = OSDynamicCast(OSBoolean, dict->getObject("Clicking"));
+        if(clicking) {
+            gesturerec->softc->settings.tapToClickEnabled = clicking->isTrue();
+        }
+        
+        OSBoolean *dragging = OSDynamicCast(OSBoolean, dict->getObject("Dragging"));
+        if (dragging){
+            gesturerec->softc->settings.tapDragEnabled = dragging->isTrue();
+        }
+        
+        OSBoolean *hscroll  = OSDynamicCast(OSBoolean, dict->getObject("TrackpadHorizScroll"));
+        if (hscroll){
+            horizontalScroll = hscroll->isTrue();
+        }
+        
+    } else {
+        //OS X 10.11 and below
+        
+        OSNumber *clicking = OSDynamicCast(OSNumber, dict->getObject("Clicking"));
+        if (clicking ){
+            gesturerec->softc->settings.tapToClickEnabled = clicking->unsigned32BitValue() & 0x1;
+        }
+        
+        OSNumber *dragging = OSDynamicCast(OSNumber, dict->getObject("Dragging"));
+        if (dragging) {
+            gesturerec->softc->settings.tapDragEnabled = dragging->unsigned32BitValue() & 0x1;
+        }
+        
+        OSNumber *hscroll = OSDynamicCast(OSNumber, dict->getObject("TrackpadHorizScroll"));
+        if(hscroll) {
+            horizontalScroll = hscroll->unsigned32BitValue() & 0x1;
+        }
     }
     
     gesturerec->softc->settings.multiFingerTap = true;
     
-    OSNumber *hscroll  = OSDynamicCast(OSNumber, dict->getObject("TrackpadHorizScroll"));
-    if (hscroll){
-        horizontalScroll = hscroll->unsigned32BitValue() & 0x1;
-    }
     return super::setParamProperties(dict);
 }
-
