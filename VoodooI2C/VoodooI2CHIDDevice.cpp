@@ -184,7 +184,7 @@ int VoodooI2CHIDDevice::initHIDDevice(I2CDevice *hid_device) {
      }
      */
     
-    i2c_hid_get_report_descriptor(ihid);
+    // i2c_hid_get_report_descriptor(ihid);
 
     initialize_wrapper();
     registerService();
