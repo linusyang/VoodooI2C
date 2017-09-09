@@ -21,15 +21,6 @@ struct dw_scl_sda_cfg {
     uint32_t sda_hold;
 };
 
-/* BayTrail HCNT/LCNT/SDA hold time */
-static struct dw_scl_sda_cfg byt_config = {
-    .ss_hcnt = 0x200,
-    .fs_hcnt = 0x55,
-    .ss_lcnt = 0x200,
-    .fs_lcnt = 0x99,
-    .sda_hold = 0x6,
-};
-
 /* Haswell HCNT/LCNT/SDA hold time */
 static struct dw_scl_sda_cfg hsw_config = {
     .ss_hcnt = 0x01b0,
@@ -621,8 +612,6 @@ bool VoodooI2C::start(IOService * provider) {
         return false;
     }
     
-    _dev->interruptSource->enable();
-    
     //set up command gate
     
     _dev->commandGate = IOCommandGate::commandGate(this);
@@ -691,14 +680,14 @@ bool VoodooI2C::start(IOService * provider) {
     
     disableI2CInt(_dev);
     
-    
-    
     registerService();
     
     IORegistryIterator* children;
     IORegistryEntry* child;
     
     _dev->busIsAwake = true;
+    
+    _dev->interruptSource->enable();
  
     //enumerate I2C children, TODO: major refactoring
     
@@ -723,13 +712,16 @@ bool VoodooI2C::start(IOService * provider) {
                                     strcmp(getMatchedName((IOService *)child), "ELAN0600") == 0 ||
                                     strcmp(getMatchedName((IOService *)child), "ELAN0605") == 0 ||
                                     strcmp(getMatchedName((IOService *)child), "ELAN1000") == 0)){
-                                bus_devices[bus_devices_number] = OSTypeAlloc(VoodooI2CElanTouchpadDevice);
-                        } else if (strcmp(getMatchedName((IOService *)child), "SYNA0000") == 0){
+                            bus_devices[bus_devices_number] = OSTypeAlloc(VoodooI2CElanTouchpadDevice);
+                    } else if (strcmp(getMatchedName((IOService *)child), "SYNA0000") == 0){
                             bus_devices[bus_devices_number] = OSTypeAlloc(VoodooSynapticsRMITouchpadDevice);
+                        } else if (strcmp(getMatchedName((IOService *)child), "ELAN0651") == 0){
+                            bus_devices[bus_devices_number] = OSTypeAlloc(VoodooI2CPrecisionTouchpadDevice);
                         } else
                             bus_devices[bus_devices_number] = OSTypeAlloc(VoodooI2CHIDDevice);
-                        if ( !bus_devices[bus_devices_number]               ||
-                            !bus_devices[bus_devices_number]->init()       ||
+                        if (!bus_devices[bus_devices_number])
+                            continue;
+                        if (!bus_devices[bus_devices_number]->init()       ||
                             !bus_devices[bus_devices_number]->attach(this, (IOService*)child) )
                         {
                             OSSafeReleaseNULL(bus_devices[bus_devices_number]);
@@ -739,7 +731,7 @@ bool VoodooI2C::start(IOService * provider) {
 #ifdef IGNORED_DEVICE
                     }
 #endif
-                }
+                }\
                 iter->release();
             }
             set->release();
